@@ -13,6 +13,18 @@ A self-hosted AI data assistant that lives inside a [Grist](https://www.getgrist
 
 ---
 
+## Demo
+
+![Map overview with smart suggestions](docs/screenshots/01-overview.jpg)
+
+*A 1,000-row Malaysian schools table rendered as a 100 m-radius point map. The left panel shows auto-generated suggestion chips derived from the schema — categorical breakdowns, distributions, time-series, data-quality check — all without typing a single query. The widget also reports **133 outliers filtered** using a MAD-based robust geo-bound, so distant typo coordinates don't blow up the map view.*
+
+![Click any marker to inspect the underlying row](docs/screenshots/02-popup.jpg)
+
+*Click any marker → full row popup with all non-empty columns (NEGERI, PPD_DAERAH, KOD_SEKOLAH_KPM, NAMA_INSTITUSI, JENIS_INSTITUSI, …). Toggle between street and satellite basemaps from the layers control on the left.*
+
+---
+
 ## Features
 
 - **Natural-language queries** in English, Chinese (Simplified/Traditional), and Bahasa Malaysia
