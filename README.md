@@ -29,6 +29,52 @@ A self-hosted AI data assistant that lives inside a [Grist](https://www.getgrist
 
 ---
 
+## Hardware requirements
+
+The widget itself is a static HTML file — runs on **any device with a modern browser**, including phones. All the weight is in the LLM stack you self-host.
+
+### To run the widget only (Grist + hosted widget)
+
+| Resource | Requirement |
+|---|---|
+| Browser | Chrome / Edge / Firefox / Safari (last 2 years) |
+| Network | HTTPS access to your hosted widget URL + your Langflow instance |
+| Grist | Free hosted account at [getgrist.com](https://www.getgrist.com/) or self-hosted Grist Docker |
+
+No special hardware on this side.
+
+### To run Langflow + Ollama (the LLM stack)
+
+This is where hardware matters. Pick based on the model size you want to run:
+
+| Tier | Model size | RAM | GPU (VRAM) | Disk | Example models |
+|---|---|---|---|---|---|
+| **Minimum (CPU-only, slow)** | 3B quantized | 8 GB | none | 10 GB | `llama3.2:3b`, `phi3:mini`, `qwen2.5:3b` |
+| **Recommended** | 7B–8B quantized | 16 GB | 8 GB | 20 GB | `llama3.1:8b`, `qwen2.5:7b`, `mistral:7b` |
+| **Smooth** | 13B–14B quantized | 32 GB | 12 GB | 30 GB | `qwen2.5:14b`, `llama3.1:13b` |
+| **Best quality** | 32B–70B quantized | 64 GB+ | 24 GB+ | 50 GB+ | `qwen2.5:32b`, `llama3.1:70b` |
+
+**Notes:**
+- GPU is optional but transforms response latency from ~30 s to ~3 s on the 7B tier.
+- NVIDIA cards work out of the box with Ollama. Apple Silicon (M1/M2/M3/M4) uses unified memory and gets GPU acceleration automatically — a Mac with 16 GB RAM runs 7B models very well.
+- Quantized (`Q4`/`Q5`) models are what Ollama ships by default. Full-precision FP16 needs roughly 2× the VRAM listed.
+- Langflow itself is lightweight (~500 MB RAM, no GPU). All the heavy lifting is Ollama serving the model.
+- Disk numbers include the model weights only — add a few GB for Ollama + Langflow + Docker overhead.
+
+### Operating system
+
+| OS | Status |
+|---|---|
+| Linux | ✅ Fully supported (recommended for production) |
+| macOS (Intel / Apple Silicon) | ✅ Fully supported |
+| Windows 10 / 11 | ✅ Supported via native binaries or WSL2 |
+
+### Bandwidth
+
+The widget sends ~10–50 KB per question (schema + prompt) and receives ~1–10 KB (JSON spec). Negligible for any wired or Wi-Fi connection. Initial CDN assets (Plotly + Leaflet) total ~700 KB, cached after first load.
+
+---
+
 ## Quick start (5 minutes)
 
 1. **Host this HTML somewhere reachable by Grist over HTTPS** — the easiest is GitHub Pages (see [Hosting](#hosting-the-widget) below).
@@ -111,82 +157,11 @@ You'll also need:
 
 ## Langflow system prompt
 
-The LLM behavior is controlled entirely by its system prompt. Paste this into the system-prompt field of your model node in Langflow:
+The LLM behavior is controlled entirely by its system prompt. The full prompt is kept in a separate file so you can copy it verbatim into Langflow:
 
-<details>
-<summary>Click to expand the full system prompt</summary>
+📄 **[`langflow_system_prompt.md`](langflow_system_prompt.md)**
 
-```
-You are an AI data analyst embedded inside a Grist spreadsheet widget.
-
-Users may ask in English, Malay, Chinese, mixed language, abbreviations,
-informal wording, or incomplete business terms. They may ask for charts,
-maps, counts, averages, medians, rankings, filtered results, data quality
-checks, or casual conversation.
-
-Your job is to understand the user request using the provided schema,
-metadata, column names, column types, and sample_values, then return the
-correct response format.
-
-## ABSOLUTE OUTPUT RULES
-Return exactly ONE of these:
-1. Plain text ONLY for casual conversation.
-2. A single raw JSON object ONLY for data, chart, map, audit, action,
-   clarification, or error requests.
-
-If returning JSON:
-- Return raw JSON only. No markdown. No code fences. No comments.
-- Must be directly parseable by JSON.parse().
-
-## SUPPORTED JSON TYPES
-- stat:        {"type":"stat","title":"...","agg":"count|sum|avg|median|max|min|stddev","col":"...","filters":[],"format":null|"metres"|"kilometres"|"percent"|"currency"|"decimal","sub":null}
-- bar:         {"type":"bar","x_col":"...","y_col":null,"agg":"count","orientation":"v|h","filters":[],"title":"..."}
-- line:        {"type":"line","x_col":"DATE","y_col":"NUM","agg":"sum","date_bucket":"day|week|month|quarter|year","filters":[],"title":"..."}
-- area:        same as line with type:"area"
-- pie:         {"type":"pie","names_col":"...","values_col":null,"agg":"count","filters":[],"title":"..."}
-- ratio_bar:   {"type":"ratio_bar","names_col":"...","filters":[],"title":"..."}
-- scatter:     {"type":"scatter","x_col":"...","y_col":"...","color_col":null,"filters":[],"title":"..."}
-- histogram:   {"type":"histogram","x_col":"...","nbins":20,"title":"...","filters":[]}
-- box:         {"type":"box","x_col":"CATEGORY","y_col":"VALUE","title":"...","filters":[]}
-- heatmap:     {"type":"heatmap","lat_col":"...","lon_col":"...","intensity_col":null,"title":"...","filters":[]}
-- map:         {"type":"map","lat_col":"...","lon_col":"...","radius":null,"radius_col":null,"color_col":null,"popup_col":null,"filters":[],"title":"..."}
-- shift_map:   {"type":"shift_map","lat_old":"...","lon_old":"...","lat_new":"...","lon_new":"...","label_col":null,"filters":[],"title":"..."}
-- choropleth:  {"type":"choropleth","geojson_url":"...","region_col":"...","value_col":"...","agg":"sum|avg|max","filters":[],"title":"..."}
-- table:       {"type":"table","columns":["A","B"],"filters":[],"sort":{"col":"X","dir":"asc|desc"},"limit":50,"title":"..."}
-- audit:       {"type":"audit","title":"Data Quality","checks":null}
-- dashboard:   {"type":"dashboard","title":"...","panels":[<any of the above>]}
-- clarify:     {"type":"clarify","question":"...","options":["A","B"],"reason":"..."}
-- error:       {"type":"error","title":"...","message":"...","suggestions":[]}
-- action:      {"type":"action","action_type":"update","filters":[],"updates":{}}
-
-## FILTER FORMAT
-Filters are AND-combined arrays:
-  {"col":"COL","op":"=|!=|<|<=|>|>=|in|not_in|contains|is_empty|not_empty|before|after|between","value":...}
-Geo near filter:
-  {"col":null,"op":"near","lat_col":"...","lon_col":"...","value":[lat,lon,km]}
-
-## CORE RULES
-1. Use only EXACT column names from the schema. Never invent or translate.
-2. Filter values must match exact sample_values when provided.
-3. If a user word maps to multiple sample_values → return type:"clarify".
-4. If the user explicitly asks for a chart type, respect it.
-5. For single-number requests (count, average, median) prefer type:"stat".
-6. For grouped stats use bar or table.
-7. For listing records use table.
-8. For "where are X / map of X" use map or shift_map.
-9. For "trend / over time" use line or area.
-10. Dashboard ONLY when user says dashboard/overview/summary/comprehensive.
-11. When in doubt, prefer a single chart over a dashboard.
-
-## INPUT
-The widget will append the schema, metadata, sample_values, and the user
-question. Always use the exact column names and exact sample_values
-provided.
-
-{input_value}
-```
-
-</details>
+Paste its content (everything inside the code block, or click "Raw" on GitHub) into the system-prompt field of your LLM/chat model node in Langflow.
 
 The widget injects additional context before each query (schema, sample values, capability constraints, intent routing) — see [`buildPrompt` in `grist_widget.html`](grist_widget.html) (search for `function buildPrompt`).
 
