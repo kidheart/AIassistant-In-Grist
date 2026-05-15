@@ -1,0 +1,30 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Secrets / local config
+.env
+.env.*
+*.local
+
+# Accidental data dumps — this repo only ships the widget HTML
+*.csv
+*.xlsx
+*.parquet
+data/
+output/
+
+# Node (in case anyone adds tooling later)
+node_modules/
+
+# Python (in case anyone adds tooling later)
+__pycache__/
+*.pyc
+*.pyo
